@@ -3,6 +3,23 @@ import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import { createObjectCsvWriter } from 'csv-writer';
 import config from './config.js';
 
+function objectsAreEqual(obj1, obj2) {
+  const keys1 = Object.keys(obj1);
+  const keys2 = Object.keys(obj2);
+
+  if (keys1.length !== keys2.length) {
+    return false;
+  }
+
+  for (let key of keys1) {
+    if (obj1[key] !== obj2[key]) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 const csvWriter = createObjectCsvWriter({
   path: config.CSV_FILE_NAME, // Replace with your CSV file name
   header: [
@@ -52,9 +69,9 @@ async function run() {
     await page.setRequestInterception(true);
     page.on('request', (request) => {
       if (request.resourceType() === 'document') {
-      request.continue();
+        request.continue();
       } else {
-      request.abort();
+        request.abort();
       }
     });
 
@@ -152,6 +169,8 @@ async function run() {
     for (const [index, category] of links.entries()) {
       console.log(`\x1b[36m${index + 1}: ${category.category}:\x1b[0m`);
 
+      let prevRecords = {}
+
       for (const [idx, subCategory] of category.subCategories.entries()) {
         console.log(`  \x1b[32m${idx + 1}. ${subCategory.subCategory}\x1b[0m - \x1b[34m${subCategory.link}\x1b[0m`);
         let pageNumber = 1;
@@ -217,9 +236,16 @@ async function run() {
               subCategory.subCategory,  // Pass the string argument
             );
 
+            
             // Output the extracted data
             console.log(`\x1b[33m    Page ${pageNumber} fetched\x1b[0m`);
+            // Check if the records are the same as the previous records
+            if (objectsAreEqual(businesses, prevRecords)) {
+              console.log(`\x1b[33m    Duplicate records found. Exiting...\x1b[0m`);
+              break;
+            }
             await writeRecords(businesses);
+            prevRecords = businesses;
             pageNumber++;
           } catch (error) {
             console.error(error)
